@@ -24,6 +24,16 @@ class Bootstrap implements BootstrapInterface
     public function bootstrap($app)
     {
         if ($app->hasModule('gii')) {
+
+            // register translations
+            if (!isset($app->get('i18n')->translations['goodmall*'])) {
+                $app->get('i18n')->translations['goodmall*'] = [
+                    'class'    => 'yii\i18n\PhpMessageSource',
+                    'basePath' => __DIR__ . '/messages',
+                    // 'sourceLanguage' => 'zh-CN',
+                ];
+            }
+
             if (!isset($app->getModule('gii')->generators['giiant-goodmall-pod'])) {
                 $app->getModule('gii')->generators['gii-goodmall-pod'] = 'year\gii\goodmall\generators\pod\Generator';
             }
@@ -33,14 +43,26 @@ class Bootstrap implements BootstrapInterface
                 $app->getModule('gii')->generators[$gk] = 'year\gii\goodmall\generators\model\Generator';
             }
 
+            $gk =     'giiant-goodmall-repo' ;
+            if (!isset($app->getModule('gii')->generators[$gk])) {
+                $app->getModule('gii')->generators[$gk] = 'year\gii\goodmall\generators\repository\Generator';
+            }
+
+
             $gk =     'giiant-goodmall-crud' ;
             if (!isset($app->getModule('gii')->generators[$gk])) {
                 $app->getModule('gii')->generators[$gk] = 'year\gii\goodmall\generators\crud\Generator';
             }
 
-            $gk =     'giiant-goodmall-repo' ;
+            $gk =     'giiant-goodmall-apis' ;
             if (!isset($app->getModule('gii')->generators[$gk])) {
-                $app->getModule('gii')->generators[$gk] = 'year\gii\goodmall\generators\repository\Generator';
+                $app->getModule('gii')->generators[$gk] = [
+                    'class'=>'year\gii\goodmall\generators\api\Generator',
+                    // 配置针对其他框架的模板
+                    'templates'=>[
+                        'echo'=>__DIR__.'/generators/api/echo' ,
+                    ],
+                 ] ;
             }
 
             if ($app instanceof \yii\console\Application) {

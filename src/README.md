@@ -1,20 +1,17 @@
 yii2-gii-goodmall
 ===========
 
-> "Giiant is huge!"
+> "Goodmall is good!"
 
 **PROJECT IS IN BETA STAGE!**
 
-Note: Major changes from 0.4 to 0.5, see [upgrading](UPGRADING.md) for details.
-
-[![Build Status](https://travis-ci.org/schmunk42/yii2-giiant.svg?branch=master)](https://travis-ci.org/schmunk42/yii2-giiant)
 
 这是啥?
 -------------
 
-根据你的表结构 给你生出前端react的整套*crud*功能的文件集合
+根据你的表结构 给你生对应的crud功能的代码
 
-代码主要学自 *giiant*
+
 
 参考 
 - [organizing-large-react-applications](http://engineering.kapost.com/2016/01/organizing-large-react-applications)
@@ -24,10 +21,6 @@ Note: Major changes from 0.4 to 0.5, see [upgrading](UPGRADING.md) for details.
 Resources
 ---------
 
-- [Documentation](docs/README.md)
-- [Project Source-Code](https://github.com/schmunk42/yii2-giiant)
-- [Packagist](https://packagist.org/packages/schmunk42/yii2-giiant)
-- [Yii Extensions](http://www.yiiframework.com/extension/yii2-giiant/)
 
 
 Features
@@ -57,21 +50,15 @@ Installation
 ------------
 
 ~~~
-    	 "repositories":[
-           {
-             "type": "path",
-             "url": "./year/gii/goodmall",
-               "options": {
-                   "symlink": true
-               }
-           }
-           ]
-          
-          require:{
-            "year/gii-goodmall": "^1.0.0"           
+    	 'bootstrap' => [
+                //  'queue', // The component registers own console commands
+                [
+                    'class'=>'year\gii\goodmall\Bootstrap',   // gii的goodmall 代码生成
+                    'giiBaseUrl'=>'http://localhost:1323'  //  此处配置是应用参数注入 可以在其他地方访问：  Yii::$app->params['goodmall.giiBaseUrl']
+                ],
+            ],       
 ~~~
-注意一旦安装成功 信息会写到yiisoft/extension 的扩展集合中（因为 **"type": "yii2-extension"**,） 如果通过composer卸载了该插件
- 有可能需要你手动删除extensions.php下的相关片段！
+
 
 Configuration
 -------------
@@ -97,13 +84,6 @@ See the [batches](docs/20-batches.md) section for configuration details.
 Usage
 -----
 
-To create a full-featured database backend, run the CLI batch command
-
-    yii batch
-
-You can still override the settings from the configuration, like selecting specific tables
-
-    yii batch --tables=a,list,of,tables
 
 
 ### Core commands
@@ -119,7 +99,6 @@ goodmallnced
 
 ### Using callbacks to provide code-snippets
 
-See [docs](docs/31-callback-provider-examples.md) for details.
 
 ### Troubleshooting
 
@@ -134,9 +113,6 @@ Screenshots
 -----------
 
 
-
-在该库下 是可以继承giiant 里面的对应类的 就不用你重头写了 把giiant当**类库**用就对了
-
 Built by [yiqing](http://gitbub.com/yiqing)
 
 ##  硬链接
@@ -150,11 +126,11 @@ Built by [yiqing](http://gitbub.com/yiqing)
  例子
 ~~~win-cmd
 
-mklink /D .src  C:"\Program Files\Java"
+mklink /J .src  C:"\Program Files\Java"
 
 ~~~
-在提交时会发生递归提交 
-此时先右击目录 用git的add 命令先添加 然后再提交 就可以了
+必须用 硬链接才可以  软连接符号链接不可行！  
+请自行 搜索 "mklink /D和/J的区别"
 
 参考： https://github.com/git-for-windows/git/wiki/Symbolic-Links#creating-symbolic-links
 
