@@ -7,6 +7,7 @@
 
 namespace year\gii\goodmall\generators\api;
 
+use schmunk42\giiant\helpers\GiiantFaker;
 use year\gii\goodmall\Config;
 use year\gii\goodmall\utils\QualifiedTypeValidator;
 use Yii;
@@ -16,6 +17,7 @@ use yii\db\Schema;
 use yii\gii\CodeFile;
 use yii\helpers\Inflector;
 use yii\helpers\VarDumper;
+use yii\web\Application;
 use yii\web\Controller;
 
 /**
@@ -69,19 +71,38 @@ class Generator extends \yii\gii\Generator
     public $searchModelType  ;
 
 
-    public $modelClass;
-    public $controllerClass;
-    public $viewPath;
-    public $baseControllerClass = 'yii\web\Controller';
-    public $indexWidgetType = 'grid';
-    public $searchModelClass = '';
     /**
-     * @var bool whether to wrap the `GridView` or `ListView` widget with the `yii\widgets\Pjax` widget
-     * @since 2.0.5
+     * @var string
      */
-    public $enablePjax = false;
+    public $tableName;
+    /**
+     * @inheritdoc
+     */
+    public function autoCompleteData()
+    {
+        $db = $this->getDbConnection();
+        if ($db !== null) {
+            return [
+                'tableName' => function () use ($db) {
+                    return $db->getSchema()->getTableNames();
+                },
+            ];
+        } else {
+            return [];
+        }
+    }
 
 
+    public $db = 'db';
+
+    /**
+     * @return null|object|\yii\db\Connection
+     * @throws \yii\base\InvalidConfigException
+     */
+    protected function getDbConnection()
+    {
+        return Yii::$app->get($this->db, false);
+    }
 
     public function init()
     {
@@ -139,7 +160,9 @@ class Generator extends \yii\gii\Generator
             [['searchModelType'], 'required'],
             [['searchModelType'], QualifiedTypeValidator::className(),],
 
-
+            [['db', 'tableName',], 'filter', 'filter' => 'trim'],
+            [['tableName'], 'match', 'pattern' => '/^([\w ]+\.)?([\w\* ]+)$/', 'message' => 'Only word characters, and optionally spaces, an asterisk and/or a dot are allowed.'],
+            [['tableName'], 'validateTableName', ],
             // [['podPath'], 'required'],
            // [['podPath'], 'validatePodPath'],
 
@@ -147,17 +170,6 @@ class Generator extends \yii\gii\Generator
            // [['interactorName'], 'required'],
 
 
-            [['searchModelClass'], 'compare', 'compareAttribute' => 'modelClass', 'operator' => '!==', 'message' => 'Search Model Class must not be equal to Model Class.'],
-
-            [['modelClass', 'controllerClass', 'baseControllerClass', 'searchModelClass'], 'match', 'pattern' => '/^[\w\\\\]*$/', 'message' => 'Only word characters and backslashes are allowed.'],
-            [['baseControllerClass'], 'validateClass', 'params' => ['extends' => Controller::className()]],
-            [['controllerClass'], 'match', 'pattern' => '/(^|\\\\)[A-Z][^\\\\]+Controller$/', 'message' => 'Controller class name must start with an uppercase letter.'],
-            [['controllerClass', 'searchModelClass'], 'validateNewClass'],
-            [['indexWidgetType'], 'in', 'range' => ['grid', 'list']],
-            [['modelClass'], 'validateModelClass'],
-            [['enableI18N', 'enablePjax'], 'boolean'],
-            [['messageCategory'], 'validateMessageCategory', 'skipOnEmpty' => false],
-            ['viewPath', 'safe'],
         ]);
     }
 
@@ -167,13 +179,7 @@ class Generator extends \yii\gii\Generator
     public function attributeLabels()
     {
         return array_merge(parent::attributeLabels(), [
-            'modelClass' => 'Model Class',
-            'controllerClass' => 'Controller Class',
-            'viewPath' => 'View Path',
-            'baseControllerClass' => 'Base Controller Class',
-            'indexWidgetType' => 'Widget Used in Index Page',
-            'searchModelClass' => 'Search Model Class',
-            'enablePjax' => 'Enable Pjax',
+//            'modelClass' => 'Model Class',
         ]);
     }
 
@@ -184,13 +190,6 @@ class Generator extends \yii\gii\Generator
     {
         return array_merge(parent::hints(), [
             'podPath' => 'This is the pod home dir for your specified pod . e.g., <code>\$GOPATH\src\github.com\goodmall\goodmall\pods\user</code>',
-            'interactorName' => 'This is the  interactor name of the interactor without the Interactor suffix .',
-            'modelClass' => 'This is the ActiveRecord class associated with the table that CRUD will be built upon.
-                You should provide a fully qualified class name, e.g., <code>app\models\Post</code>.',
-            'controllerClass' => 'This is the name of the controller class to be generated. You should
-                provide a fully qualified namespaced class (e.g. <code>app\controllers\PostController</code>),
-                and class name should be in CamelCase with an uppercase first letter. Make sure the class
-                is using the same namespace as specified by your application\'s controllerNamespace property.',
 
         ]);
     }
@@ -208,20 +207,9 @@ class Generator extends \yii\gii\Generator
      */
     public function stickyAttributes()
     {
-        return array_merge(parent::stickyAttributes(), ['baseControllerClass', 'indexWidgetType']);
-    }
-
-    /**
-     * Checks if model class is valid
-     */
-    public function validateModelClass()
-    {
-        /* @var $class ActiveRecord */
-        $class = $this->modelClass;
-        $pk = $class::primaryKey();
-        if (empty($pk)) {
-            $this->addError('modelClass', "The table associated with $class must have primary key(s).");
-        }
+        return array_merge(parent::stickyAttributes(), [
+//            'baseControllerClass', 'indexWidgetType'
+        ]);
     }
 
 
@@ -252,6 +240,35 @@ class Generator extends \yii\gii\Generator
             new CodeFile($interactorFile, $this->render('controller.go.php')),
         ];
 
+        // routes
+        $routesFile = implode(DIRECTORY_SEPARATOR,[
+            $this->podPath,
+            $this->podId,
+            'routes.go',
+        ]);
+        $files[]  =   new CodeFile($routesFile, $this->render('routes.go.php')) ;
+        // 先生文件然后再删掉
+        Yii::$app->on(Application::EVENT_AFTER_ACTION,function ()use($routesFile){
+            if(file_exists($routesFile)){
+                usleep(1000) ;
+                unlink($routesFile) ;
+            }
+
+        });
+
+        if (!empty($this->tableName)){
+            $docFile = implode(DIRECTORY_SEPARATOR,[
+                $this->podPath,
+                $this->podId,
+                'docs',
+                $this->controllerType.'.go',
+            ]);
+            $params = [
+               // 'fieldsInfo'=>$this->generateProperties($this->getTableSchema()),
+            ];
+            $files[]  =   new CodeFile($docFile, $this->render('docs.go.php',$params)) ;
+        }
+
         return $files ;
         //
         if (!empty($this->searchModelClass)) {
@@ -271,6 +288,14 @@ class Generator extends \yii\gii\Generator
         }
 
         return $files;
+    }
+
+    public function successMessage()
+    {
+        $return = $this->render('routes.go.php');
+        $return .= '<br/><code>'.$return.'</code>';
+
+        return $return;
     }
 
     /**
@@ -302,84 +327,6 @@ class Generator extends \yii\gii\Generator
 
 
 
-    /**
-     * Generates column format
-     * @param \yii\db\ColumnSchema $column
-     * @return string
-     */
-    public function generateColumnFormat($column)
-    {
-        if ($column->phpType === 'boolean') {
-            return 'boolean';
-        } elseif ($column->type === 'text') {
-            return 'ntext';
-        } elseif (stripos($column->name, 'time') !== false && $column->phpType === 'integer') {
-            return 'datetime';
-        } elseif (stripos($column->name, 'email') !== false) {
-            return 'email';
-        } elseif (preg_match('/(\b|[_-])url(\b|[_-])/i', $column->name)) {
-            return 'url';
-        } else {
-            return 'text';
-        }
-    }
-
-
-
-    /**
-     * @return array searchable attributes
-     */
-    public function getSearchAttributes()
-    {
-        return $this->getColumnNames();
-    }
-
-
-
-    /**
-     * Generates URL parameters
-     * @return string
-     */
-    public function generateUrlParams()
-    {
-        /* @var $class ActiveRecord */
-        $class = $this->modelClass;
-        $pks = $class::primaryKey();
-        if (count($pks) === 1) {
-            if (is_subclass_of($class, 'yii\mongodb\ActiveRecord')) {
-                return "'id' => (string)\$model->{$pks[0]}";
-            } else {
-                return "'id' => \$model->{$pks[0]}";
-            }
-        } else {
-            $params = [];
-            foreach ($pks as $pk) {
-                if (is_subclass_of($class, 'yii\mongodb\ActiveRecord')) {
-                    $params[] = "'$pk' => (string)\$model->$pk";
-                } else {
-                    $params[] = "'$pk' => \$model->$pk";
-                }
-            }
-
-            return implode(', ', $params);
-        }
-    }
-
-    /**
-     * Generates action parameters
-     * @return string
-     */
-    public function generateActionParams()
-    {
-        /* @var $class ActiveRecord */
-        $class = $this->modelClass;
-        $pks = $class::primaryKey();
-        if (count($pks) === 1) {
-            return '$id';
-        } else {
-            return '$' . implode(', $', $pks);
-        }
-    }
 
     /**
      * Generates parameter tags for phpdoc
@@ -416,43 +363,59 @@ class Generator extends \yii\gii\Generator
      */
     public function getTableSchema()
     {
-        /* @var $class ActiveRecord */
-        $class = $this->modelClass;
-        if (is_subclass_of($class, 'yii\db\ActiveRecord')) {
-            return $class::getTableSchema();
-        } else {
-            return false;
-        }
+       return   $this->getDbConnection()->getTableSchema($this->tableName) ;
     }
 
+
     /**
-     * @return array model column names
+     * FIXME
+     * Validates the [[tableName]] attribute.
      */
-    public function getColumnNames()
+    public function validateTableName()
     {
-        /* @var $class ActiveRecord */
-        $class = $this->modelClass;
-        if (is_subclass_of($class, 'yii\db\ActiveRecord')) {
-            return $class::getTableSchema()->getColumnNames();
-        } else {
-            /* @var $model \yii\base\Model */
-            $model = new $class();
-
-            return $model->attributes();
+       /*
+        $ts =  $this->getTableSchema() ;
+        if (empty($ts)) {
+            $this->addError('tableName', "Table '{$this->tableName}' does not exist.");
         }
+       */
     }
-
     /**
-     * @return string|null driver name of modelClass db connection.
-     * In case db is not instance of \yii\db\Connection null will be returned.
+     * TODO 此处可改为go类型映射
+     *
+     * Generates the properties for the specified table.
+     * @param \yii\db\TableSchema $table the table schema
+     * @return array the generated properties (property => type)
      * @since 2.0.6
      */
-    protected function getClassDbDriverName()
+    public function generateProperties($table)
     {
-        /* @var $class ActiveRecord */
-        $class = $this->modelClass;
-        $db = $class::getDb();
-        return $db instanceof \yii\db\Connection ? $db->driverName : null;
+        $properties = [];
+        foreach ($table->columns as $column) {
+            $columnPhpType = $column->phpType;
+            if ($columnPhpType === 'integer') {
+                $type = 'int';
+            } elseif ($columnPhpType === 'boolean') {
+                $type = 'bool';
+            } else {
+                $type = $columnPhpType;
+            }
+            /*
+            if (!$column->allowNull && $column->defaultValue === null) {
+                $types['required'][] = $column->name;
+            }
+            */
+            // FIXME 这里关于可选值 总感觉怪怪的
+            $properties[$column->name] = [
+                'type' => $type,
+                'name' => $column->name,
+                'comment' => $column->comment,
+                'isOptional' => $column->allowNull || $column->defaultValue !== null ,
+                'default'=>$column->defaultValue ,
+            ];
+        }
+
+        return $properties;
     }
 
     /**
@@ -466,4 +429,27 @@ class Generator extends \yii\gii\Generator
             $this->addError('podPath', ' please check the pod path which should exists： ' . $this->podPath);
         }
     }
+
+    /**
+     *
+     * Generates the properties for the specified table.
+     * @param \yii\db\TableSchema $table the table schema
+     * @return array the generated fake record for table
+     * @since 0.0.1
+     */
+    public function genFakeRecord($table)
+    {
+        $fakeRow = [] ;
+        foreach ($table->columns as $column) {
+            $columnPhpType = $column->phpType;
+            $fakeRow[$column->name] =   \year\gii\goodmall\helpers\GiiantFaker::value(
+                $columnPhpType,
+                $column->name
+            )  ;//  call_user_func_array(['year\gii\goodmall\helpers\GiiantFaker',$columnPhpType],[$column->name] );
+           // $fakeRow[$column->name] =  GiiantFaker::{$columnPhpType};
+
+        }
+        return $fakeRow ;
+    }
+
 }

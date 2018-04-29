@@ -34,3 +34,6 @@ echo $form->field($generator, 'interactorType');
 echo $form->field($generator, 'modelType');
 
 echo $form->field($generator, 'searchModelType');
+
+// FIXME 如果不输入对应的表名  需要通过modelType 得到字段信息  这个可能需要调用go端的api才行
+echo $form->field($generator, 'tableName');
